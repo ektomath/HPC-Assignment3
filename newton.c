@@ -7,6 +7,7 @@ int main(int argc, char* argv[]) {
     int nrThreads;
 	int lines;
     int degreePolynomial;
+    int nrBaseColors = 3; // RGB
 
 	printf(" #arguments: %d\n", argc);
 	for (int i = 1; i < argc; i++) { // iterate through the received character vector
@@ -25,8 +26,8 @@ int main(int argc, char* argv[]) {
         perror("Error opening file to read");
         return 1;
     }
-    int startRows[] = {0, 2, 5, 9, 14, 20, 27, 35, 44};
-    fseek(file,  startRows[degreePolynomial - 1] * ( 7 * 2 + 3) , SEEK_SET); // sets file pointer to correct start position
+    int startPosition[] = {0, 17, 50, 99, 164, 244, 340, 453, 582};
+    fseek(file,  startPosition[degreePolynomial - 1], SEEK_SET); // sets file pointer to correct start position
     float **matrixRoots = (float **)malloc(degreePolynomial * sizeof(float *));
     for (int i = 0; i < degreePolynomial; i++) {
         matrixRoots[i] = (float *)malloc(2 * sizeof(float));
@@ -37,16 +38,55 @@ int main(int argc, char* argv[]) {
         matrixRoots[rootNr][0] = realPart;
         matrixRoots[rootNr][1] = imaginaryPart;
     }
-
-
-    // Iterate through the matrix and print each element, for testing
+    fclose(file);
+    /*
     for (int i = 0; i < degreePolynomial; i++) {
         for (int j = 0; j < 2; j++) {
-            printf("%f\t", matrixRoots[i][j]);
+            printf("%d ", matrixRoots[i][j]);
         }
-        printf("\n"); // Move to the next row
-    }
+    }*/
     /*************************** COMPUTE NEWTONS METHOD HERE **************************/
 
     /*************************** WRITE IMAGE HERE **************************/
+    unsigned char **colorsMatrix = (unsigned char **) malloc(lines * lines * sizeof(unsigned char *));
+    for (int i = 0; i < lines * lines; i++) {
+        colorsMatrix[i] = (unsigned char *) malloc(nrBaseColors * sizeof(unsigned char));
+    }
+    for (int i = 0; i < lines * lines; i++) {
+        colorsMatrix[i][0] = 0;
+        colorsMatrix[i][1] = 255;
+        colorsMatrix[i][2] = 0;
+    }
+
+    for (int i = 0; i < lines * lines; i++) {
+        for (int j = 0; j < nrBaseColors; j++) {
+            printf("%d ", colorsMatrix[i][j]);
+        }
+        printf("(row %d) \n", i);
+    }
+
+    // Open a file for writing
+    FILE *outFile = fopen("newton_attractors_xd.ppm", "wb"); // "wb" for binary write mode
+
+    if (outFile == NULL) {
+        perror("Error opening the file");
+        return 1;
+    }
+    fprintf(outFile, "P3\n%d %d\n%d\n", lines, lines, 255);
+
+
+    // Close the file
+    fclose(outFile);
+
+    // free memory stuff here
+    for (int i = 0; i < degreePolynomial; i++) {
+        free(matrixRoots[i]);
+    }
+    free(matrixRoots);
+
+    for (int i = 0; i < lines * lines; i++) {
+        free(colorsMatrix[i]);
+    }
+    free(colorsMatrix);
+    return 0;
 }
