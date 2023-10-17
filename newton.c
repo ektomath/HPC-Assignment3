@@ -398,8 +398,8 @@ int main(int argc, char* argv[]) {
     fprintf(grayFile, "P3\n%d %d\n%d\n", lines, lines, 255);
     fprintf(colorFile, "P3\n%d %d\n%d\n", lines, lines, 255);
     int counter = 0;
-    for (int iReal = 0; iReal < lines; iReal++) {
-        for (int iImag = 0; iImag < lines; iImag++, counter++) {
+    for (int iImag = 0; iImag < lines; iImag++) {
+        for (int iReal = 0; iReal < lines; iReal++, counter++) {
             fwrite(colorsPalette[pixels[iImag][iReal].indexOfRoot], sizeof(char), 12, colorFile);
             fwrite(colorsPaletteGrayscale[pixels[iImag][iReal].iterationsToConverge], sizeof(char), 12, grayFile);
         }
