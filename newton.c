@@ -139,6 +139,25 @@ char colorsPaletteGrayscale[130][12] = {
         "end00000000\n"
 };
 
+float complex rootsPol1[] = {1.0000 + 0.0000 * I};
+float complex rootsPol2[] = {1.0000 + 0.0000 * I, -1.0000 + 0.0000 * I};
+float complex rootsPol3[] = {1.0000 + 0.0000 * I, -0.5000 + 0.8660 * I, -0.5000 - 0.8660 * I};
+float complex rootsPol4[] = {1.0000 + 0.0000 * I, -1.0000 + 0.0000 * I, 0.0000 + 1.0000 * I,
+                             0.0000 - 1.0000 * I};
+float complex rootsPol5[] = {1.0000 + 0.0000 * I, -0.8090 + 0.5878 * I, -0.8090 - 0.5878 * I,
+                             0.3090 + 0.9511 * I, 0.3090 - 0.9511 * I};
+float complex rootsPol6[] = {1.0000 + 0.0000 * I, -1.0000 + 0.0000 * I, -0.5000 + 0.8660 * I,
+                             -0.5000 - 0.8660 * I, 0.5000 + 0.8660 * I, +0.5000 - 0.8660 * I};
+float complex rootsPol7[] = {1.0000 + 0.0000 * I, -0.9010 + 0.4339 * I, -0.9010 - 0.4339 * I,
+                             -0.2225 + 0.9749 * I, -0.2225 - 0.9749 * I, 0.6235 + 0.7818 * I,
+                             0.6235 - 0.7818 * I};
+float complex rootsPol8[] = {1.0000 + 0.0000 * I, -1.0000 + 0.0000 * I, 0.0000 + 1.0000 * I,
+                             0.0000 - 1.0000 * I, -0.7071 + 0.7071 * I, -0.7071 - 0.7071 * I,
+                             0.7071 + 0.7071 * I, 0.7071 - 0.7071 * I};
+float complex rootsPol9[] = {1.0000 + 0.0000 * I, -0.9397 + 0.3420 * I, -0.9397 - 0.3420 * I,
+                             -0.5000 + 0.8660 * I, -0.5000 - 0.8660 * I, 0.1736 + 0.9848 * I,
+                             0.1736 - 0.9848 * I, 0.7660 + 0.6428 * I, 0.7660 - 0.6428 * I};
+
 typedef struct {
     float realPart;
     float imaginaryPart;
@@ -166,7 +185,7 @@ int checkTermination(int degree, float complex* rootsArray, float complex x) {
     } if (creal(x) > xMax || -creal(x) > xMax) { // checks if real part of x is too large
         //printf("too muchhhh\n");
         return 9;
-    } if (cimag(x) > xMax || -cimag(x) > xMax) {
+    } if (cimag(x) > xMax || -cimag(x) > xMax) { // checks if imaginary part of x is too large
         //printf("too muchhhh\n");
         return 9;
     }
@@ -278,46 +297,61 @@ void newtonsMethod(int degree, complex float* rootsArray, TYPE_ATTR* startNumber
     }
     startNumber->indexOfRoot = 9;
     exit_switch:
-        startNumber->iterationsToConverge = iteration;
+    startNumber->iterationsToConverge = iteration;
 }
 
 
 int main(int argc, char* argv[]) {
-	/*************************** READ CLI HERE **************************/
+    /*************************** READ CLI HERE **************************/
     int nrThreads;
-	int lines;
+    int lines;
     int degreePolynomial;
 
-	printf(" #arguments: %d\n", argc);
-	for (int i = 1; i < argc; i++) { // iterate through the received character vector
-		if (strncmp(argv[i], "-t", 2) == 0) { // checks if the  -t prefix is found
+    printf(" #arguments: %d\n", argc);
+    for (int i = 1; i < argc; i++) { // iterate through the received character vector
+        if (strncmp(argv[i], "-t", 2) == 0) { // checks if the  -t prefix is found
             nrThreads = atoi(argv[i] + 2);
-		} else if (strncmp(argv[i], "-l", 2) == 0) { // checks if the -l prefix is found
-			lines = atoi(argv[i] + 2);
-		}
+        } else if (strncmp(argv[i], "-l", 2) == 0) { // checks if the -l prefix is found
+            lines = atoi(argv[i] + 2);
+        }
         degreePolynomial = atoi(argv[argc-1]); // last character will be the polynomial degree
-	}
-	printf(" nrThreads is %d\n nrLines is %d\n degreePolynomial is %d\n", nrThreads, lines, degreePolynomial);
-
-    /********* READ FILE CONTAINING PRECOMPUTED ROOTS ***************/
-    FILE *file = fopen("roots.txt", "r");
-    if (file == NULL) {
-        perror("Error opening file to read");
-        return 1;
     }
-    int startPosition[] = {0, 17, 50, 99, 164, 244, 340, 453, 582};
-    fseek(file,  startPosition[degreePolynomial - 1], SEEK_SET); // sets file pointer to correct start position
+    printf(" nrThreads is %d\n nrLines is %d\n degreePolynomial is %d\n", nrThreads, lines, degreePolynomial);
 
-    float realPart, imaginaryPart;
+    /********* GET PRECOMPUTED ROOTS ***************/
     float complex rootsArray[degreePolynomial];
-    float complex root;
-    for (int rootNr = 0; rootNr < degreePolynomial; rootNr++) {
-        fscanf(file, "%f %f", &realPart, &imaginaryPart);
-        root = realPart + imaginaryPart * I;
-        rootsArray[rootNr] = root;
+    switch (degreePolynomial) {
+        case 1:
+             memcpy((void*)rootsArray, rootsPol1, sizeof(rootsArray));
+             break;
+        case 2:
+            memcpy((void*)rootsArray, rootsPol2, sizeof(rootsArray));
+            break;
+        case 3:
+            memcpy((void*)rootsArray, rootsPol3, sizeof(rootsArray));
+            break;
+        case 4:
+            memcpy((void*)rootsArray, rootsPol4, sizeof(rootsArray));
+            break;
+        case 5:
+            memcpy((void*)rootsArray, rootsPol5, sizeof(rootsArray));
+            break;
+        case 6:
+            memcpy((void*)rootsArray, rootsPol6, sizeof(rootsArray));
+            break;
+        case 7:
+            memcpy((void*)rootsArray, rootsPol7, sizeof(rootsArray));
+            break;
+        case 8:
+            memcpy((void*)rootsArray, rootsPol8, sizeof(rootsArray));
+            break;
+        case 9:
+            memcpy((void*)rootsArray, rootsPol9, sizeof(rootsArray));
+            break;
+        default:
+            printf("Error: something went wrong with the polynom degree...\n");
+            return -1;
     }
-
-    fclose(file);
 
     /*************************** COMPUTE NEWTONS METHOD HERE **************************/
     //TYPE_ATTR firstX0;
@@ -371,7 +405,8 @@ int main(int argc, char* argv[]) {
         }
     }
     fclose(colorFile);
+
+    free(pixelsEntries);
+    free(pixels);
     return 0;
 }
-
-
