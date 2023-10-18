@@ -1,9 +1,8 @@
-#include <math.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <threads.h>
 #include <complex.h>
+
 
 char colorsPalette[10][12] = {"251 180 174\n", "179 205 227\n", "204 235 197\n", "222 203 228\n", "254 217 166\n", "255 255 204\n", "229 216 189\n", "253 218 236\n", "242 242 242\n", "255 255 255\n"};
 //char colorsPaletteGrayscale[9][12] = {"000 000 000\n", "037 037 037\n", "082 082 082\n", "115 115 115\n", "150 150 150\n", "189 189 189\n", "217 217 217\n", "240 240 240\n", "255 255 255\n"};
@@ -159,258 +158,33 @@ float complex rootsPol9[] = {1.0000 + 0.0000 * I, -0.9397 + 0.3420 * I, -0.9397 
                              -0.5000 + 0.8660 * I, -0.5000 - 0.8660 * I, 0.1736 + 0.9848 * I,
                              0.1736 - 0.9848 * I, 0.7660 + 0.6428 * I, 0.7660 - 0.6428 * I};
 
-
 typedef struct {
     float realPart;
     float imaginaryPart;
     unsigned char indexOfRoot;
-    unsigned char iterationsToConverge;
+    short iterationsToConverge;
 } TYPE_ATTR ;
 
 
-typedef struct {
-    unsigned char nrThreads;
-    unsigned char id;
-    int lines;
-    void* pPixels;
-    unsigned char degreePolynomial;
-    void* pRootsArray;
-    int* currentPixelRow;
-} thrd_info_pixels;
-
-typedef struct {
-    unsigned char id;
-    int lines;
-    unsigned char degreePolynomial;
-    unsigned char nrThreads;
-    void* pPixels;
-    FILE* pFileColor;
-    FILE* pFileGray;
-    int currentWriteRow;
-    int* posPixelThreads;
-} thrd_info_write;
-
-
-void newtonsMethod(int degree, complex float* rootsArray, TYPE_ATTR* startNumber);
-int checkTermination(int degree, float complex* rootsArray, float complex x);
-static inline int findMin(int *arr, int size);
-
-
-
-int iterateThroughPixels(void* args) {
-    thrd_info_pixels* input = (thrd_info_pixels*) args;
-    TYPE_ATTR **pixels = (TYPE_ATTR**) input->pPixels;
-
-    for (int iImag = input->id; iImag < input->lines; iImag += input->nrThreads) {
-        for (int iReal = 0; iReal < input->lines; iReal++) {
-            newtonsMethod(input->degreePolynomial, input->pRootsArray, &pixels[iImag][iReal]);
-        }
-        *input->currentPixelRow = iImag;
-    }
-    *input->currentPixelRow = input->lines;
-}
-
-int writeRowsToFile(void* args) {
-    thrd_info_write* input = (thrd_info_write*) args;
-    TYPE_ATTR** pixels = (TYPE_ATTR **) input->pPixels;
-
-    //TODO, CREATE BUFFER
-
-
-    for (int iImag = 0; iImag < input->lines; iImag++) {
-        beginningOfIteration:
-        if (findMin(input->posPixelThreads, input->nrThreads) > iImag) {
-            for (int iReal = 0; iReal < input->lines; iReal++) {
-                //printf("%s\n", colorsPalette[pixels[iImag][iReal].indexOfRoot]);
-                fwrite(colorsPalette[pixels[iImag][iReal].indexOfRoot], sizeof(char), 12, input->pFileColor);
-                fwrite(colorsPaletteGrayscale[pixels[iImag][iReal].iterationsToConverge], sizeof(char), 12, input->pFileGray);
-            }
-        } else {
-            thrd_sleep(&(struct timespec){.tv_sec=0, .tv_nsec=10}, NULL);
-            goto beginningOfIteration;
-        }
-    }
-}
-
-int main(int argc, char* argv[]) {
-    /*************************** READ CLI HERE **************************/
-    int nrThreads;
-    int lines;
-    int degreePolynomial;
-
-    //printf(" #arguments: %d\n", argc);
-    for (int i = 1; i < argc; i++) { // iterate through the received character vector
-        if (strncmp(argv[i], "-t", 2) == 0) { // checks if the  -t prefix is found
-            nrThreads = atoi(argv[i] + 2);
-        } else if (strncmp(argv[i], "-l", 2) == 0) { // checks if the -l prefix is found
-            lines = atoi(argv[i] + 2);
-        }
-        degreePolynomial = atoi(argv[argc - 1]); // last character will be the polynomial degree
-    }
-    //printf(" nrThreads is %d\n nrLines is %d\n degreePolynomial is %d\n", nrThreads, lines, degreePolynomial);
-
-    // open file for writing
-    // Open a file for writing
-    char filename1[24];
-    char filename2[23];
-    sprintf(filename1, "newton_attractors_x%d.ppm", degreePolynomial);
-    sprintf(filename2, "newton_convergence_x%d.ppm", degreePolynomial);
-    FILE *colorFile = fopen(filename1, "wb"); // "wb" for binary write mode
-    if (colorFile == NULL) {
-        perror("Error opening the file");
-        return 1;
-    }
-    FILE *grayFile = fopen(filename2, "wb"); // "wb" for binary write mode
-    if (grayFile == NULL) {
-        perror("Error opening the file");
-        return 1;
-    }
-    fprintf(grayFile, "P3\n%d %d\n%d\n", lines, lines, 255);
-    fprintf(colorFile, "P3\n%d %d\n%d\n", lines, lines, 255);
-
-    /********* GET PRECOMPUTED ROOTS ***************/
-    float complex rootsArray[degreePolynomial];
-    switch (degreePolynomial) {
-        case 1:
-            memcpy((void *) rootsArray, rootsPol1, sizeof(rootsArray));
-            break;
-        case 2:
-            memcpy((void *) rootsArray, rootsPol2, sizeof(rootsArray));
-            break;
-        case 3:
-            memcpy((void *) rootsArray, rootsPol3, sizeof(rootsArray));
-            break;
-        case 4:
-            memcpy((void *) rootsArray, rootsPol4, sizeof(rootsArray));
-            break;
-        case 5:
-            memcpy((void *) rootsArray, rootsPol5, sizeof(rootsArray));
-            break;
-        case 6:
-            memcpy((void *) rootsArray, rootsPol6, sizeof(rootsArray));
-            break;
-        case 7:
-            memcpy((void *) rootsArray, rootsPol7, sizeof(rootsArray));
-            break;
-        case 8:
-            memcpy((void *) rootsArray, rootsPol8, sizeof(rootsArray));
-            break;
-        case 9:
-            memcpy((void *) rootsArray, rootsPol9, sizeof(rootsArray));
-            break;
-        default:
-            printf("Error: something went wrong with the polynom degree...\n");
-            return -1;
-    }
-
-
-    // CREATE PIXELS MATRIX
-    float spacing = (-2.0 - 2.0) / (lines - 1.0);
-    TYPE_ATTR *pixelsEntries = (TYPE_ATTR *) malloc(sizeof(TYPE_ATTR) * lines * lines);
-    TYPE_ATTR **pixels = (TYPE_ATTR **) malloc(sizeof(TYPE_ATTR *) * lines);
-    for (size_t i = 0, j = 0; i < lines; ++i, j += lines)
-        pixels[i] = pixelsEntries + j;
-
-    for (int iImag = 0; iImag < lines; iImag++) {
-        for (int iReal = 0; iReal < lines; iReal++) {
-            pixels[iImag][iReal].realPart = -2 - iReal * spacing;
-            pixels[iImag][iReal].imaginaryPart = -2 - iImag * spacing;
-            //newtonsMethod(degreePolynomial, rootsArray, &pixels[iImag][iReal]);
-            //printf("real part: %f, imaginary part: %f, root found %d.\n", pixels[iImag][iReal].realPart, pixels[iImag][iReal].imaginaryPart, pixels[iImag][iReal].indexOfRoot);
-        }
-    }
-    // CREATE THREADS
-    thrd_t thrds[nrThreads];
-    thrd_info_pixels thrds_info[nrThreads];
-
-
-    // create stuff for write thread here
-    thrd_t writeThread;
-    thrd_info_write info_write;
-
-    info_write.lines = lines;
-    info_write.pFileColor = colorFile;
-    info_write.pFileGray = grayFile;
-    info_write.pPixels = pixels;
-    info_write.degreePolynomial = degreePolynomial;
-    info_write.id = nrThreads;
-    info_write.nrThreads = nrThreads;
-
-
-    // Create array for keeping track of thread progress
-    int donePixelRow[nrThreads];
-    for (int i = 0; i < nrThreads; i++){
-        donePixelRow[i] = 0;
-    }
-
-    // create stuff for read thread here
-    for (int threadId = 0; threadId < nrThreads; ++threadId) {
-        thrds_info[threadId].id = threadId;
-        thrds_info[threadId].nrThreads = nrThreads;
-        thrds_info[threadId].lines = lines;
-        thrds_info[threadId].degreePolynomial = degreePolynomial;
-        thrds_info[threadId].pPixels = pixels;
-        thrds_info[threadId].pRootsArray = &rootsArray;
-        thrds_info[threadId].currentPixelRow = &donePixelRow[threadId];
-
-
-        // call pixels thread here
-        int r = thrd_create(thrds + threadId, iterateThroughPixels, (void *) (thrds_info + threadId));
-        if (r != thrd_success) {
-            fprintf(stderr, "failed to create thread\n");
-            exit(1);
-        }
-    }
-
-
-
-
-    // call write thread
-    info_write.posPixelThreads = donePixelRow;
-    {
-        int r = thrd_create(&writeThread, writeRowsToFile, (void *) &info_write);
-        if (r != thrd_success) {
-            fprintf(stderr, "failed to create thread\n");
-            exit(1);
-        }
-    }
-
-
-    for (int threadId = 0; threadId < nrThreads; ++threadId) {
-        thrd_join(thrds[threadId], NULL);
-    }
-    thrd_join(writeThread, NULL);
-
-
-    free(pixelsEntries);
-    free(pixels);
-    fclose(colorFile);
-    fclose(grayFile);
-    return 0;
-}
-
-
-
-
 int checkTermination(int degree, float complex* rootsArray, float complex x) {
-float tolerance = 0.000001; // 10^-6
-long int xMax = 10000000000;
-for (int root = 0; root < degree; root++) { // checks if distance from x to all the other roots is small enough
-float distance = (creal(x) - creal(rootsArray[root])) * (creal(x) - creal(rootsArray[root])) + (cimag(x) - cimag(rootsArray[root])) * (cimag(x) - cimag(rootsArray[root]));
-if (distance < tolerance) {
-return root;
-}
-}
-if ( creal(x) * creal(x) + cimag(x) * cimag(x)  < tolerance) { // check if distance from x to 0 is small
-return 9;
-} if (creal(x) > xMax || -creal(x) > xMax) { // checks if real part of x is too large
-//printf("too muchhhh\n");
-return 9;
-} if (cimag(x) > xMax || -cimag(x) > xMax) { // checks if imaginary part of x is too large
-//printf("too muchhhh\n");
-return 9;
-}
-return 99;
+    float tolerance = 0.000001; // 10^-6
+    long int xMax = 10000000000;
+    for (int root = 0; root < degree; root++) { // checks if distance from x to all the other roots is small enough
+        float distance = (creal(x) - creal(rootsArray[root])) * (creal(x) - creal(rootsArray[root])) + (cimag(x) - cimag(rootsArray[root])) * (cimag(x) - cimag(rootsArray[root]));
+        if (distance < tolerance) {
+            return root;
+        }
+    }
+    if ( creal(x) * creal(x) + cimag(x) * cimag(x)  < tolerance) { // check if distance from x to 0 is small
+        return 9;
+    } if (creal(x) > xMax || -creal(x) > xMax) { // checks if real part of x is too large
+        //printf("too muchhhh\n");
+        return 9;
+    } if (cimag(x) > xMax || -cimag(x) > xMax) { // checks if imaginary part of x is too large
+        //printf("too muchhhh\n");
+        return 9;
+    }
+    return 99;
 }
 
 
@@ -521,17 +295,117 @@ void newtonsMethod(int degree, complex float* rootsArray, TYPE_ATTR* startNumber
     startNumber->iterationsToConverge = iteration;
 }
 
-static inline int findMin(int *arr, int size) {
-    if (size <= 0) {
-        // Handle the case of an empty array or invalid size
-        printf("Array is empty or size is invalid.\n");
-        return -1;  // You can choose an appropriate error code
+
+int main(int argc, char* argv[]) {
+    /*************************** READ CLI HERE **************************/
+    int nrThreads;
+    int lines;
+    int degreePolynomial;
+
+    printf(" #arguments: %d\n", argc);
+    for (int i = 1; i < argc; i++) { // iterate through the received character vector
+        if (strncmp(argv[i], "-t", 2) == 0) { // checks if the  -t prefix is found
+            nrThreads = atoi(argv[i] + 2);
+        } else if (strncmp(argv[i], "-l", 2) == 0) { // checks if the -l prefix is found
+            lines = atoi(argv[i] + 2);
+        }
+        degreePolynomial = atoi(argv[argc-1]); // last character will be the polynomial degree
     }
-    int min = arr[0];
-    for (int i = 1; i < size; i++) {
-        if (arr[i] < min) {
-            min = arr[i]; // Update min if a smaller element is found
+    printf(" nrThreads is %d\n nrLines is %d\n degreePolynomial is %d\n", nrThreads, lines, degreePolynomial);
+
+    /********* GET PRECOMPUTED ROOTS ***************/
+    float complex rootsArray[degreePolynomial];
+    switch (degreePolynomial) {
+        case 1:
+             memcpy((void*)rootsArray, rootsPol1, sizeof(rootsArray));
+             break;
+        case 2:
+            memcpy((void*)rootsArray, rootsPol2, sizeof(rootsArray));
+            break;
+        case 3:
+            memcpy((void*)rootsArray, rootsPol3, sizeof(rootsArray));
+            break;
+        case 4:
+            memcpy((void*)rootsArray, rootsPol4, sizeof(rootsArray));
+            break;
+        case 5:
+            memcpy((void*)rootsArray, rootsPol5, sizeof(rootsArray));
+            break;
+        case 6:
+            memcpy((void*)rootsArray, rootsPol6, sizeof(rootsArray));
+            break;
+        case 7:
+            memcpy((void*)rootsArray, rootsPol7, sizeof(rootsArray));
+            break;
+        case 8:
+            memcpy((void*)rootsArray, rootsPol8, sizeof(rootsArray));
+            break;
+        case 9:
+            memcpy((void*)rootsArray, rootsPol9, sizeof(rootsArray));
+            break;
+        default:
+            printf("Error: something went wrong with the polynom degree...\n");
+            return -1;
+    }
+
+    /*************************** COMPUTE NEWTONS METHOD HERE **************************/
+    //TYPE_ATTR firstX0;
+    //firstX0.realPart = -1/2;
+    //firstX0.imaginaryPart = -1;
+    //newtonsMethod(degreePolynomial, rootsArray, &firstX0);
+    //printf("converges towards root nr %d\n", firstX0.indexOfRoot);
+
+    // iterate through all pixels = lines*lines
+    // save found root for each pixel
+    // give each root a color
+    // write color to file
+
+    float spacing = (-2.0 - 2.0) / (lines - 1.0);
+
+    TYPE_ATTR *pixelsEntries = (TYPE_ATTR*) malloc(sizeof(TYPE_ATTR) * lines * lines);
+    TYPE_ATTR **pixels = (TYPE_ATTR**) malloc(sizeof(TYPE_ATTR*) * lines);
+    for ( size_t i = 0, j = 0; i < lines; ++i, j+=lines )
+        pixels[i] = pixelsEntries + j;
+
+    for (int iImag = 0; iImag < lines; iImag++) {
+        for (int iReal = 0; iReal < lines; iReal++) {
+            pixels[iImag][iReal].realPart = -2 - iReal * spacing;
+            pixels[iImag][iReal].imaginaryPart = -2 - iImag * spacing;
+            newtonsMethod(degreePolynomial, rootsArray, &pixels[iImag][iReal]);
+            //printf("real part: %f, imaginary part: %f, root found %d.\n", pixels[iImag][iReal].realPart, pixels[iImag][iReal].imaginaryPart, pixels[iImag][iReal].indexOfRoot);
         }
     }
-    return min;
+
+
+
+    /*************************** WRITE IMAGE HERE **************************/
+    char filename1[24];
+    char filename2[23];
+    sprintf(filename1, "newton_attractors_x%d.ppm", degreePolynomial);
+    sprintf(filename2, "newton_convergence_x%d.ppm", degreePolynomial);
+    // Open a file for writing
+    FILE *colorFile = fopen(filename1, "wb"); // "wb" for binary write mode
+    if (colorFile == NULL) {
+        perror("Error opening the file");
+        return 1;
+    }
+    FILE *grayFile = fopen(filename2, "wb"); // "wb" for binary write mode
+    if (grayFile == NULL) {
+        perror("Error opening the file");
+        return 1;
+    }
+    fprintf(grayFile, "P3\n%d %d\n%d\n", lines, lines, 255);
+    fprintf(colorFile, "P3\n%d %d\n%d\n", lines, lines, 255);
+    int counter = 0;
+    for (int iImag = 0; iImag < lines; iImag++) {
+        for (int iReal = 0; iReal < lines; iReal++, counter++) {
+            fwrite(colorsPalette[pixels[iImag][iReal].indexOfRoot], sizeof(char), 12, colorFile);
+            fwrite(colorsPaletteGrayscale[pixels[iImag][iReal].iterationsToConverge], sizeof(char), 12, grayFile);
+        }
+    }
+    fclose(colorFile);
+
+    free(pixelsEntries);
+    free(pixels);
+    return 0;
 }

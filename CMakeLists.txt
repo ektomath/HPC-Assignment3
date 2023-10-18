@@ -6,5 +6,5 @@ set(CMAKE_C_STANDARD 11)
 include_directories(.)
 
 add_executable(Assignment3
-        newton.c
+        newton_backup.c
         parsingClargs.c)
