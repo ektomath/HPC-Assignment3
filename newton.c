@@ -220,11 +220,19 @@ int writeRowsToFile(void* args) {
     for (int iImag = 0; iImag < input->lines; iImag++) {
         beginningOfIteration:
         if (findMin(input->posPixelThreads, input->nrThreads) > iImag) {
+            char strRowsColor[input->lines][12];
+            char strRowsGray[input->lines][12];
+
             for (int iReal = 0; iReal < input->lines; iReal++) {
-                //printf("%s\n", colorsPalette[pixels[iImag][iReal].indexOfRoot]);
-                fwrite(colorsPalette[pixels[iImag][iReal].indexOfRoot], sizeof(char), 12, input->pFileColor);
-                fwrite(colorsPaletteGrayscale[pixels[iImag][iReal].iterationsToConverge], sizeof(char), 12, input->pFileGray);
+                //printf("sizeOfColorsPalette: %d\n", sizeof(colorsPalette[pixels[iImag][iReal].indexOfRoot]));
+                //memcpy(strRowsColor[iReal], colorsPalette + pixels[iImag][iReal].indexOfRoot * 12, 12);
+                //memcpy(strRowsGray[iReal], colorsPalette + pixels[iImag][iReal].iterationsToConverge * 12, 12 );
+                memcpy(strRowsColor[iReal], colorsPalette[pixels[iImag][iReal].indexOfRoot], 12);
+                memcpy(strRowsGray[iReal], colorsPaletteGrayscale[pixels[iImag][iReal].iterationsToConverge], 12);
+                //printf("%s\n", strRowsColor[iReal]);
             }
+            fwrite(strRowsColor, sizeof(char), 12 * input->lines, input->pFileColor);
+            fwrite(strRowsGray, sizeof(char), 12 * input->lines, input->pFileGray);
         } else {
             thrd_sleep(&(struct timespec){.tv_sec=0, .tv_nsec=10}, NULL);
             goto beginningOfIteration;
